@@ -34,8 +34,46 @@ def DrawCameras(R, C,plt,ax,label):
     angle = Rotation.from_matrix(R).as_euler("XYZ")
     angle = np.rad2deg(angle)
     plt.plot(C[0],C[2],marker=(3, 0, int(angle[1])),markersize=15,linestyle='None') 
-   
-    ax.annotate(label,xy=(C[0]))
+    corr = -0.1
+    ax.annotate(label,xy=(C[0]+corr,C[2]+corr))
+
+
+def projectionMatrix(R,C,K):
+    C = np.reshape(C,(3,1))
+    I = np.identity(3)
+    P = np.dot(K,np.dot(R,np.hstack((I,-C))))
+    return P
+
+def ReProjectionError(X,pt1, pt2, R1, C1, R2, C2, K):
+    p1 = projectionMatrix(R1, C1, K)
+    p2 = projectionMatrix(R2, C2, K)
+
+    # print("This i s p1",p1,p1.shape)
+    # print("This i s p2",p2,p2.shape)
+    p1_1T, p1_2T, p1_3T = p1
+    # print(p1_1T.shape, p1_2T.shape, p1_3T.shape )
+    p1_1T, p1_2T, p1_3T = p1_1T.reshape(1,4), p1_2T.reshape(1,4), p1_3T.reshape(1,4)
+
+    p2_1T, p2_2T, p2_3T = p2
+    p2_1T, p2_2T, p2_3T = p2_1T.reshape(1,4), p2_2T.reshape(1,4), p2_3T.reshape(1,4)
+
+    X = X.reshape(4,1)
+
+    "Reprojection error w.r.t 1st Ref camera points"
+    u1, v1 = pt1[0], pt1[1]
+    # print(u1,v1)
+    # print(p1_1T.shape,(p1_3T.shape),X.shape)
+    u1_projection = np.divide(p1_1T.dot(X), p1_3T.dot(X))
+    v1_projection = np.divide(p1_2T.dot(X), p1_3T.dot(X))
+    err1 = np.square(v1 - v1_projection) + np.square(u1 - u1_projection)
+
+    "Reprojection error w.r.t 2nd Ref camera points"
+    u2, v2 = pt2[0], pt2[1]
+    u2_projection = np.divide(p2_1T.dot(X), p2_3T.dot(X))
+    v2_projection = np.divide(p2_2T.dot(X), p2_3T.dot(X))
+    err2 = np.square(v2 - v2_projection) + np.square(u2 - u2_projection)
+
+    return err1, err2
 
 #Reading the set of matches for the five images given and extracting features
 def features_from_matches():
@@ -127,7 +165,7 @@ def main():
             idx = np.array(idx).reshape(-1)
             
             if len(idx) > 8:
-                F_inliers, inliers_idx = GetInliersRANSAC(pts1,pts2,2000,0.003,idx)                
+                F_inliers, inliers_idx = GetInliersRANSAC(pts1,pts2,2000,0.002,idx)                
                 f_matrix[i,j] = F_inliers
                 filtered_feature_flag[inliers_idx,j] = 1
                 filtered_feature_flag[inliers_idx,i] = 1
@@ -165,6 +203,7 @@ def main():
     # X = X/X[3]
     X = np.array(X)
 
+    print("X.shape :",X.shape)
 
     plt.figure("camera disambiguation")
     # plt.set(xlim=(-30, 30), ylim=(-30,30))
@@ -173,22 +212,22 @@ def main():
     colors = ['red','brown','greenyellow','teal']
     for color, X_c in zip(colors, X):
         plt.scatter(X_c[:,0],X_c[:,2],color=color,marker='.')
-    plt.savefig("/home/uthira/RBE549_SFM_NERF-main/usivaraman_P2/Phase1/Data/IntermediateOutputImages/DisambiguateCameraPose.jpg")
+    plt.savefig("/home/uthira/Documents/GitHub/SFM_NERF_WORKING/usivaraman_P2/Phase1/Data/IntermediateOutputImages/DisambiguateCameraPose.jpg")
    
     plt.show()
     plt.close()
 
-    # # Given World point X and Camera Poses, Disambiguating 
-    # Rpose,Cpose,Xpose =DisambiguateCameraPose(RSet,CSet,X)
-    # Xpose = Xpose/Xpose[3]
-    # # Xpose = Xpose[0:3]
-    # Xpose = np.array(Xpose)
+    # Given World point X and Camera Poses, Disambiguating 
+    Rpose,Cpose,Xpose =DisambiguatePose(RSet,CSet,X)
+    Xpose = Xpose/Xpose[:,3].reshape(-1,1)
    
-    # fig = plt.figure()
-    # ax = fig.add_subplot()
-    # plt.scatter(X[:,0], X[:,2],c="g",s=1,label="Linear Triangulation")
-    # plt.savefig("/home/uthira/Documents/GitHub/RBE549_SFM_NERF/usivaraman_P2/Phase1/Data/IntermediateOutputImages/Linear_Triangulation.jpg")
-
+    fig = plt.figure("LT, NLT")
+    ax = fig.add_subplot()
+    plt.xlim([-30, 30])
+    plt.ylim([-10, 30])
+    plt.scatter(Xpose[:,0], Xpose[:,2],c="b",s=1,label="Linear Triangulation")
+    # plt.savefig("/home/uthira/Documents/GitHub/SFM_NERF_WORKING/usivaraman_P2/Phase1/Data/IntermediateOutputImages/Linear_Triangulation.jpg")
+    
     # plt.show()
     # plt.close()
 
@@ -202,21 +241,44 @@ def main():
 
 
     # # Given World Point X and Camera Poses, We refine the world Point using geometric error using Non Linear Triangulation 
-    # X_optimized = NonlinearTriangulation(K,R1_,C1_,Rpose,Cpose,pts1, pts2, Xpose)
-    # fig = plt.figure()
-    # ax = fig.add_subplot()
-    # plt.scatter(X_optimized[:,0], X_optimized[:,2],c="r",s=1,label="NonLinear_Triangulation")
-    # plt.savefig("/home/uthira/Documents/GitHub/RBE549_SFM_NERF/usivaraman_P2/Phase1/Data/IntermediateOutputImages/NonLinear_Triangulation.jpg")
+    # X_optimized = NonLinearTriangulation(K,pts1, pts2, Xpose,R1_,C1_,Rpose,Cpose)
+    X_optimized = NonlinearTriangulation(K,R1_,C1_,Rpose,Cpose,pts1, pts2, Xpose)
+    print(X_optimized.shape)
+    # X_optimized = X_optimized / X_optimized[:,3].reshape(-1,1)
+    # # # #
+    # plt.figure("NlT")
+    # plt.xlim([-30, 30])
+    # plt.ylim([-10, 30])
+    plt.scatter(X_optimized[:,0], X_optimized[:,2],c="r",s=1,label="NonLinear_Triangulation")
+    # plt.savefig("/home/uthira/Documents/GitHub/SFM_NERF_WORKING/usivaraman_P2/Phase1/Data/IntermediateOutputImages/NonLinear_Triangulation.jpg")
 
     # plt.show()
     # plt.close()
 
    
-    # DrawCameras(R1_,C1_,plt,ax,"1") #Draw 1st camera 
-    # DrawCameras(Rpose,Cpose,plt,ax,"2")  # Draw 2nd camera
+    DrawCameras(R1_,C1_,plt,ax,"1") #Draw 1st camera 
+    DrawCameras(Rpose,Cpose,plt,ax,"2")  # Draw 2nd camera
+    # plt.xlim([-20, 20])
+    # plt.ylim([-15, 15])
+    plt.legend()
+    plt.show()
 
-    # plt.legend()
-    # plt.show()
+
+    total_err1 = []
+    for pt1, pt2, X_3d in zip(pts1,pts2,Xpose):
+        err1, err2 = ReProjectionError(X_3d,pt1,pt2,R1_,C1_,Rpose,Cpose,K)
+        total_err1.append(err1+err2)
+    
+    mean_err1 = np.mean(total_err1)
+
+    total_err2 = []
+    for pt1, pt2, X_3d in zip(pts1,pts2,X_optimized):
+        err1, err2 = ReProjectionError(X_3d,pt1,pt2,R1_,C1_,Rpose,Cpose,K)
+        total_err2.append(err1+err2)
+    
+    mean_err2 = np.mean(total_err2)
+
+    print("Between images",0+1,1+1,"Before optimization Linear Triang: ", mean_err1, "After optimization Non-Linear Triang: ", mean_err2)
     
 
 

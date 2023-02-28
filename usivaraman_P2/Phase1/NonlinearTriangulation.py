@@ -21,7 +21,6 @@ import scipy.optimize as optimize
 
 # After we got two camera poses and World Points X found based on linear triangulation and cheriality condition, 
 #we compute the geometric error between the given point and reprojected point and minimize the error using optimization function from scipy.
-
 def NonlinearTriangulation(K,R1,C1,R2,C2,x1, x2, X):
 
 
