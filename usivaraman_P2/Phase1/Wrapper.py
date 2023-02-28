@@ -34,9 +34,8 @@ def DrawCameras(R, C,plt,ax,label):
     angle = Rotation.from_matrix(R).as_euler("XYZ")
     angle = np.rad2deg(angle)
     plt.plot(C[0],C[2],marker=(3, 0, int(angle[1])),markersize=15,linestyle='None') 
-    corr = -0.1
-    ax.annotate(label,xy=(C[0]+corr,C[2]+corr))
-    # ax.annotate(label,xy=(C[0]))
+   
+    ax.annotate(label,xy=(C[0]))
 
 #Reading the set of matches for the five images given and extracting features
 def features_from_matches():
@@ -128,7 +127,7 @@ def main():
             idx = np.array(idx).reshape(-1)
             
             if len(idx) > 8:
-                F_inliers, inliers_idx = GetInliersRANSAC(pts1,pts2,4000,0.003,idx)                
+                F_inliers, inliers_idx = GetInliersRANSAC(pts1,pts2,2000,0.003,idx)                
                 f_matrix[i,j] = F_inliers
                 filtered_feature_flag[inliers_idx,j] = 1
                 filtered_feature_flag[inliers_idx,i] = 1
@@ -166,12 +165,11 @@ def main():
     # X = X/X[3]
     X = np.array(X)
 
-   
 
     plt.figure("camera disambiguation")
     # plt.set(xlim=(-30, 30), ylim=(-30,30))
-    plt.xlim([-15, 15])
-    plt.ylim([-10, 10])
+    plt.xlim([-20, 20])
+    plt.ylim([-15, 15])
     colors = ['red','brown','greenyellow','teal']
     for color, X_c in zip(colors, X):
         plt.scatter(X_c[:,0],X_c[:,2],color=color,marker='.')
@@ -180,40 +178,45 @@ def main():
     plt.show()
     plt.close()
 
-    # X = X.reshape(-1,1)
+    # # Given World point X and Camera Poses, Disambiguating 
+    # Rpose,Cpose,Xpose =DisambiguateCameraPose(RSet,CSet,X)
+    # Xpose = Xpose/Xpose[3]
+    # # Xpose = Xpose[0:3]
+    # Xpose = np.array(Xpose)
+   
+    # fig = plt.figure()
+    # ax = fig.add_subplot()
+    # plt.scatter(X[:,0], X[:,2],c="g",s=1,label="Linear Triangulation")
+    # plt.savefig("/home/uthira/Documents/GitHub/RBE549_SFM_NERF/usivaraman_P2/Phase1/Data/IntermediateOutputImages/Linear_Triangulation.jpg")
 
-    # Given World point X and Camera Poses, Disambiguating 
-    
-    Rpose,Cpose,Xpose =DisambiguateCameraPose(RSet,CSet,X)
-    Xpose = Xpose/Xpose[3]
-    # Xpose = Xpose[0:3]
-    Xpose = np.array(Xpose)
+    # plt.show()
+    # plt.close()
 
-    fig = plt.figure()
-    ax = fig.add_subplot()
-    plt.scatter(Xpose[:,0], Xpose[:,2],c="b",s=1,label="Disambiguate Camera Pose")
+    # fig = plt.figure()
+    # ax = fig.add_subplot()
+    # plt.scatter(Xpose[:,0], Xpose[:,2],c="b",s=1,label="Disambiguate Camera Pose")
     # plt.savefig("/home/uthira/Documents/GitHub/RBE549_SFM_NERF/usivaraman_P2/Phase1/Data/IntermediateOutputImages/DisambiguateCameraPose.jpg")
 
     # plt.show()
     # plt.close()
 
 
-    # Given World Point X and Camera Poses, We refine the world Point using geometric error using Non Linear Triangulation 
-    X_optimized = NonlinearTriangulation(K,R1_,C1_,Rpose,Cpose,pts1, pts2, Xpose)
+    # # Given World Point X and Camera Poses, We refine the world Point using geometric error using Non Linear Triangulation 
+    # X_optimized = NonlinearTriangulation(K,R1_,C1_,Rpose,Cpose,pts1, pts2, Xpose)
     # fig = plt.figure()
     # ax = fig.add_subplot()
-    plt.scatter(X_optimized[:,0], X_optimized[:,2],c="r",s=1,label="NonLinear_Triangulation")
+    # plt.scatter(X_optimized[:,0], X_optimized[:,2],c="r",s=1,label="NonLinear_Triangulation")
     # plt.savefig("/home/uthira/Documents/GitHub/RBE549_SFM_NERF/usivaraman_P2/Phase1/Data/IntermediateOutputImages/NonLinear_Triangulation.jpg")
 
     # plt.show()
     # plt.close()
 
    
-    DrawCameras(R1_,C1_,plt,ax,"1") #Draw 1st camera 
-    DrawCameras(Rpose,Cpose,plt,ax,"2")  # Draw 2nd camera
+    # DrawCameras(R1_,C1_,plt,ax,"1") #Draw 1st camera 
+    # DrawCameras(Rpose,Cpose,plt,ax,"2")  # Draw 2nd camera
 
-    plt.legend()
-    plt.show()
+    # plt.legend()
+    # plt.show()
     
 
 

@@ -49,8 +49,6 @@ def ExtractCameraPose(E):
     # print(" C3, R3 :", C3,R3)
     # print(" C4, R4 :", C4,R4)
 
-    C =[]
-    R =[]
     Camera_Poses = [[C1,R1],[C2,R2],[C3,R3],[C4,R4]]
 
     for i,cameraPose in enumerate(Camera_Poses):
@@ -62,16 +60,14 @@ def ExtractCameraPose(E):
             cameraPose[0] = -cameraPose[0]
             cameraPose[1] = -cameraPose[1]
             Camera_Poses[i] = cameraPose
-        C.append(cameraPose[0])
-        R.append(cameraPose[1])
 
     # print(" C1, R1 :", C1,R1)
     # print(" C2, R2 :", C2,R2)
     # print(" C3, R3 :", C3,R3)
     # print(" C4, R4 :", C4,R4)
 
-    # C = [C1,C2,C3,C4]
-    # R = [R1,R2,R3,R4]
+    C = [C1,C2,C3,C4]
+    R = [R1,R2,R3,R4]
 
     return C,R
 
