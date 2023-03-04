@@ -54,7 +54,7 @@ def ExtractCameraPose(E):
 
     for i,cameraPose in enumerate(Camera_Poses):
 
-        if np.linalg.det(cameraPose[1]) == -1:
+        if np.linalg.det(cameraPose[1]) <0:
 
             print("Camera Pose :",cameraPose)
 

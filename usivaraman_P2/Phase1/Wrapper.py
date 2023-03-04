@@ -19,8 +19,10 @@ Worcester Polytechnic Institute
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+import argparse
+from mpl_toolkits import mplot3d
 from scipy.spatial.transform import Rotation 
-
+import scipy
 
 from EstimateFundamentalMatrix import *
 from GetInliersRANSAC import *
@@ -29,51 +31,15 @@ from ExtractCameraPose import *
 from LinearTriangulation import *
 from DisambiguateCameraPose import *
 from NonlinearTriangulation import *
+from PnPRANSAC import *
+from NonlinearPnP import *
 
-def DrawCameras(R, C,plt,ax,label):
-    angle = Rotation.from_matrix(R).as_euler("XYZ")
-    angle = np.rad2deg(angle)
-    plt.plot(C[0],C[2],marker=(3, 0, int(angle[1])),markersize=15,linestyle='None') 
-    corr = -0.1
-    ax.annotate(label,xy=(C[0]+corr,C[2]+corr))
+from Utils import *
+from PlotUtils import *
 
 
-def projectionMatrix(R,C,K):
-    C = np.reshape(C,(3,1))
-    I = np.identity(3)
-    P = np.dot(K,np.dot(R,np.hstack((I,-C))))
-    return P
 
-def ReProjectionError(X,pt1, pt2, R1, C1, R2, C2, K):
-    p1 = projectionMatrix(R1, C1, K)
-    p2 = projectionMatrix(R2, C2, K)
 
-    # print("This i s p1",p1,p1.shape)
-    # print("This i s p2",p2,p2.shape)
-    p1_1T, p1_2T, p1_3T = p1
-    # print(p1_1T.shape, p1_2T.shape, p1_3T.shape )
-    p1_1T, p1_2T, p1_3T = p1_1T.reshape(1,4), p1_2T.reshape(1,4), p1_3T.reshape(1,4)
-
-    p2_1T, p2_2T, p2_3T = p2
-    p2_1T, p2_2T, p2_3T = p2_1T.reshape(1,4), p2_2T.reshape(1,4), p2_3T.reshape(1,4)
-
-    X = X.reshape(4,1)
-
-    "Reprojection error w.r.t 1st Ref camera points"
-    u1, v1 = pt1[0], pt1[1]
-    # print(u1,v1)
-    # print(p1_1T.shape,(p1_3T.shape),X.shape)
-    u1_projection = np.divide(p1_1T.dot(X), p1_3T.dot(X))
-    v1_projection = np.divide(p1_2T.dot(X), p1_3T.dot(X))
-    err1 = np.square(v1 - v1_projection) + np.square(u1 - u1_projection)
-
-    "Reprojection error w.r.t 2nd Ref camera points"
-    u2, v2 = pt2[0], pt2[1]
-    u2_projection = np.divide(p2_1T.dot(X), p2_3T.dot(X))
-    v2_projection = np.divide(p2_2T.dot(X), p2_3T.dot(X))
-    err2 = np.square(v2 - v2_projection) + np.square(u2 - u2_projection)
-
-    return err1, err2
 
 #Reading the set of matches for the five images given and extracting features
 def features_from_matches():
@@ -156,8 +122,8 @@ def main():
     match_pair1,match_pair2,rgb_values, feature_x,feature_y,feature_flag = features_from_matches()
     filtered_feature_flag = np.zeros_like(feature_flag) 
     f_matrix = np.empty(shape=(5,5), dtype=object)
-    for i in range(0,1): 
-        for j in range(i+1,1+2):
+    for i in range(0,4): 
+        for j in range(i+1,5):
 
             idx = np.where(feature_flag[:,i] & feature_flag[:,j])
             pts1 = np.hstack((feature_x[idx,i].reshape((-1,1)), feature_y[idx,i].reshape((-1,1))))
@@ -165,7 +131,7 @@ def main():
             idx = np.array(idx).reshape(-1)
             
             if len(idx) > 8:
-                F_inliers, inliers_idx = GetInliersRANSAC(pts1,pts2,2000,0.002,idx)                
+                F_inliers, inliers_idx = GetInliersRANSAC(pts1,pts2,8000,0.007,idx)                
                 f_matrix[i,j] = F_inliers
                 filtered_feature_flag[inliers_idx,j] = 1
                 filtered_feature_flag[inliers_idx,i] = 1
@@ -207,8 +173,8 @@ def main():
 
     plt.figure("camera disambiguation")
     # plt.set(xlim=(-30, 30), ylim=(-30,30))
-    plt.xlim([-20, 20])
-    plt.ylim([-15, 15])
+    plt.xlim([-40, 40])
+    plt.ylim([-30, 30])
     colors = ['red','brown','greenyellow','teal']
     for color, X_c in zip(colors, X):
         plt.scatter(X_c[:,0],X_c[:,2],color=color,marker='.')
@@ -260,8 +226,8 @@ def main():
     DrawCameras(Rpose,Cpose,plt,ax,"2")  # Draw 2nd camera
     # plt.xlim([-20, 20])
     # plt.ylim([-15, 15])
-    plt.legend()
-    plt.show()
+    # plt.legend()
+    # plt.show()
 
 
     total_err1 = []
@@ -280,6 +246,114 @@ def main():
 
     print("Between images",0+1,1+1,"Before optimization Linear Triang: ", mean_err1, "After optimization Non-Linear Triang: ", mean_err2)
     
+    
+    # Creating two variables X_all and X_found 
+    # X_all for storing the all world points 
+    # X _found for storing values where we have found positive depth has 1 rest has 0 
+    # We use this variable for finding points where we have found goos World Points
+    X_all = np.zeros((feature_x.shape[0],3))    
+    X_found = np.zeros((feature_x.shape[0],1), dtype = int)
+
+    X_all[idx] = Xpose[:,:3]
+    X_found[idx] = 1    
+    X_found[np.where(X_all[:2]<0)] = 0
+
+    # The first two camera C and R 
+    C_set = [C1_,Cpose]
+    R_set = [R1_,Rpose]
+
+  
+
+    for i in range(2,5):
+
+        feature_idx_i = np.where(X_found[:,0] & filtered_feature_flag[:,i])
+        if len(feature_idx_i[0]) < 8:
+            continue
+
+        pts_i = np.hstack((feature_x[feature_idx_i, i].reshape(-1,1), feature_y[feature_idx_i, i].reshape(-1,1)))
+
+        X = X_all[feature_idx_i,:].reshape(-1,3)
+
+        R_init, C_init = PnPRANSAC(X,pts_i,K, 6000,200)
+        # print("C_init:",C_init)
+        linear_error_pnp = reprojectionErrorPnP(X, pts_i, K, R_init, C_init)
+
+        Ri, Ci = NonLinearPnp(K, pts_i, X, R_init, C_init)
+        print("Ri",Ri)
+        print("Ci",Ci)
+       
+        non_linear_error_pnp = reprojectionErrorPnP(X, pts_i, K, Ri, Ci)
+        print("Initial linear PnP error: ", linear_error_pnp, " Final Non-linear PnP error: ", non_linear_error_pnp)
+
+        C_set.append(Ci)
+        R_set.append(Ri)
+
+
+        for k in range(0,i):
+            idx_X_pts = np.where(filtered_feature_flag[:,k] & filtered_feature_flag[:,i])
+            idx_X_pts = np.asarray(idx_X_pts)
+            idx_X_pts = np.squeeze(idx_X_pts)
+            if (len(idx_X_pts)<8):
+                continue
+
+            x1 = np.hstack((feature_x[idx_X_pts,k].reshape(-1,1), feature_y[idx_X_pts,k].reshape(-1,1)))
+            x2 = np.hstack((feature_x[idx_X_pts,i].reshape(-1,1), feature_y[idx_X_pts,i].reshape(-1,1)))
+
+          
+            X_d = LinearTriangulation(K,R_set[k],C_set[k],Ri,Ci,x1,x2)
+
+            linear_err = []
+            pts1 , pts2 = x1, x2
+            for pt1, pt2, X_3d in zip(pts1,pts2,X_d):
+                err1, err2 = ReProjectionError(X_3d,pt1,pt2,R_set[k],C_set[k],Ri,Ci,K)
+                linear_err.append(err1+err2)
+        
+            mean_linear_err = np.mean(linear_err)
+           
+            X = NonlinearTriangulation(K,R_set[k],C_set[k],Ri,Ci,x1,x2,X_d)
+
+            X = X/X[:,3].reshape(-1,1)
+                
+            non_linear_err = []
+            for pt1, pt2, X_3d in zip(pts1,pts2,X):
+                err1, err2 = ReProjectionError(X_3d,pt1,pt2,R_set[k],C_set[k],Ri,Ci,K)
+                non_linear_err.append(err1+err2)
+
+            mean_nonlinear_err = np.mean(non_linear_err)
+            print("Linear Triang error: ", mean_linear_err, "Non-linear Triang error: ", mean_nonlinear_err)
+
+            X_all[idx_X_pts] = X[:,:3]
+            X_found[idx_X_pts] = 1
+
+
+    X_found[X_all[:,2]<0] = 0
+    print("#############DONE###################")
+
+    feature_idx = np.where(X_found[:,0])
+    X = X_all[feature_idx]
+    x = X[:,0]
+    y = X[:,1]
+    z = X[:,2]
+
+    #####2D Plotting
+    fig = plt.figure(figsize = (10,10))
+    plt.xlim(-4,6)
+    plt.ylim(-2,12)
+    plt.scatter(x,z,marker='.',linewidths=0.5, color = 'blue')
+    for i in range(0, len(C_set)):
+        R1 = Rotation.from_matrix(R_set[i]).as_euler("XYZ")
+    
+        R1 = np.rad2deg(R1)
+        plt.plot(C_set[i][0],C_set[i][2], marker=(3,0, int(R1[1])), markersize=15, linestyle='None')
+
+    plt.savefig('/home/uthira/Documents/GitHub/SFM_NERF_WORKING/usivaraman_P2/Phase1/Data/IntermediateOutputImages/'+'2D.png')
+    plt.show()
+
+
+ 
+
+
+
 
 
 

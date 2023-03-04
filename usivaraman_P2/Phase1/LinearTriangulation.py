@@ -22,11 +22,11 @@ import matplotlib.pyplot as plt
 def LinearTriangulation(K,R1,C1,R2,C2,xpts1,xpts2):
 
 
-    print("Points input to Linear Triangulation:")
-    print("pts1 :",xpts1)
-    print("pts2 :",xpts2)
-    print("pts1.shape :",xpts1.shape)
-    print("pts2.shape :",xpts2.shape)
+    # print("Points input to Linear Triangulation:")
+    # print("pts1 :",xpts1)
+    # print("pts2 :",xpts2)
+    # print("pts1.shape :",xpts1.shape)
+    # print("pts2.shape :",xpts2.shape)
     xpts1 = np.hstack((xpts1, np.ones((xpts1.shape[0], 1)))) #Appending one to x1 and x2 
     xpts2 = np.hstack((xpts2, np.ones((xpts2.shape[0], 1))))
 
@@ -41,24 +41,24 @@ def LinearTriangulation(K,R1,C1,R2,C2,xpts1,xpts2):
         Sxpt1 = np.array([[0, -xp1[2], xp1[1]], [xp1[2], 0, -xp1[0]], [-xp1[1], xp1[0], 0]])
         Sxpt2 = np.array([[0, -xp2[2], xp2[1]], [xp2[2], 0, -xp2[0]], [-xp2[1], xp2[0], 0]])
 
-        print("Skew Symmetric Matrix formed out of pts :")
-        print(" Sxpt1 :",Sxpt1)
-        print(" Sxpt2 :",Sxpt2)
+        # print("Skew Symmetric Matrix formed out of pts :")
+        # print(" Sxpt1 :",Sxpt1)
+        # print(" Sxpt2 :",Sxpt2)
 
         S1 = Sxpt1.dot(P1)
         S2 = Sxpt2.dot(P2)
 
-        print("Dot Product of skew symmetric matrix of small x points and projection matrix  :")
-        print(" S1 :",S1)
-        print(" S2 :",S2)
+        # print("Dot Product of skew symmetric matrix of small x points and projection matrix  :")
+        # print(" S1 :",S1)
+        # print(" S2 :",S2)
 
         A = np.vstack((S1,S2))
 
-        print("A matrix :",A)
+        # print("A matrix :",A)
 
         u,s, vh = np.linalg.svd(A)
         x = vh[np.argmin(s),:] 
-        print("X  :",x)
+        # print("X  :",x)
         x = x/x[3]  
         X.append(x)
     X = np.vstack(X) 
