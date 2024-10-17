@@ -31,7 +31,11 @@ The SfM pipeline consists of the following key steps:
 ## Usage
 
 1. Place your input images in the designated data directory
-2. Run the main SfM script:
+2. Go to Code Folder
+```
+cd Code
+```
+3. Run the main SfM script:
 
 ```
 python run_sfm.py
